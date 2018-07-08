@@ -70,7 +70,7 @@ function _step_findNextTask()
       os.sleep(5)
     
     -- Resource is wool: React to it by changing direction.
-    elseif front_item.name == 'wool' then
+    elseif front_item.name == 'minecraft:wool' then
       local color = front_item.state.color
       if (color == 'red') then
         TBotAPI.turnL()
