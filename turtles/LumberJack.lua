@@ -24,21 +24,22 @@ local refuel_items_to_ignore = sapling_types
 
 
 
-os.loadAPI("TBotAPI")
+os.loadAPI("TBotAPI/init.lua")
+local TBotAPI = init
 local t = turtle
 
 
 
 
 function runCycle()
-  local step = "findTree"
+  local step = "findNextTask"
   
   while step ~= "done" do
     print("Step '" .. step .. "'...")
     -- Refuel before each step.
-    _refuel()
-    if step == "findTree" then
-      step = _step_findTree()
+    _refuelIfNeeded()
+    if step == "findNextTask" then
+      step = _step_findNextTask()
     elseif step == "harvestTree" then
       step = _step_harvestTree()
     elseif step == "collectAndPlant" then
@@ -54,16 +55,32 @@ function runCycle()
   print("Done.")
 end
 
-function _step_findTree()
+function _step_findNextTask()
   local inspect_res, front_item = t.inspect()
   
   if inspect_res then
+    -- Resource is wood: harvest.
     if _in_array(front_item.name, wood_types) then
       return "harvestTree"
+    
+    -- Resource is sapling: Wait for it to grow.
     elseif _in_array(front_item.name, sapling_types) then
       -- Wait a bit until trying again. We're basically waiting for the sapling
       -- to grow.
       os.sleep(5)
+    
+    -- Resource is wool: React to it by changing direction.
+    elseif front_item.name == 'wool' then
+      local color = front_item.state.color
+      if (color == 'red') then
+        TBotAPI.turnL()
+      elseif (color == 'green') then 
+        TBotAPI.turnR()
+      elseif (color == 'brown') then 
+        TBotAPI.moveMinusY()
+      elseif (color == 'blue') then
+        TBotAPI.movePlusY()
+      end
     else
       return "unload"
     end
@@ -71,7 +88,7 @@ function _step_findTree()
     TBotAPI.moveF()
   end
   
-  return "findTree"
+  return "findNextTask"
 end
 
 function _step_harvestTree()
@@ -141,7 +158,7 @@ function _step_collectAndPlant()
   
   _turnAround()
 
-  return "findTree"
+  return "findNextTask"
 end
 
 function _step_unload()
@@ -195,7 +212,7 @@ end
 -- @param Target num of fuel units.
 --   Optional. Defaults to the global target_fuel variable.
 -- Returns false if it could not reach target minimum fuel.
-function _refuel(target_num_fuel_units)
+function _refuelIfNeeded(target_num_fuel_units)
   if target_num_fuel_units == nil then
     target_num_fuel_units = target_fuel
   end
@@ -229,8 +246,8 @@ end
 
 -- MAIN --
 
--- Check is there is fuel first.
-local initial_refuel = _refuel(init_target_fuel)
+-- Check if there is fuel first.
+local initial_refuel = _refuelIfNeeded(init_target_fuel)
 if not initial_refuel then
   print("The turtle needs at least " .. init_target_fuel .. " units of fuel to start.")
   print("It currently has " .. t.getFuelLevel() .. " units of fuel.")
@@ -239,7 +256,7 @@ if not initial_refuel then
 end
 
 -- Confirm launch.
-print("")
+print()
 print("IMPORTANT: This program works for a certain pattern only.")
 print()
 print("About to start the mission.")
