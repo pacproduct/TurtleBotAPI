@@ -17,7 +17,7 @@ local branch = default_branch
 local arg = {...}
 
 
-if arg and arg[1] then
+if arg and arg[1] and not "update" == arg[1] then
   branch = arg[1]
   print("loading from branch "..branch.." instead of "..default_branch)
 else
