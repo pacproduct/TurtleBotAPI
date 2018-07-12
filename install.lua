@@ -1,4 +1,6 @@
 -- update pastebin at https://pastebin.com/zfVbYhca to load into the turtle
+-- loaded from the preloader (and replaces it)
+-- update by calling the script with argument "update" (updates itself from git)
 
 if not http then
     print("Sorry, I need access to the interwebs to download stuffs.")
@@ -11,13 +13,59 @@ end
 local default_branch = "master"
 local branch = default_branch
 
+local version = "0.0.4"
 
 local arg = {...}
 
-print (#arg)
+local program_name = shell.getRunningProgram()
+
+print("version "..version)
+os.sleep(0.1)
+ 
+-- Utility function to grab user input.
+local function selfUpdate(branch)
+  local url = "https://raw.githubusercontent.com/pacproduct/TurtleBotAPI/"..branch.."/install.lua"
+  
+  print("updating loader")
+  print("from '" .. url .. "'...")
+  
+  local request = http.get(url)
+  if request then
+      local response = request.getResponseCode()
+      if response == 200 then
+          local script = request.readAll()
+          local f = fs.open(program_name, "w")
+          f.write(script)
+          f.close()
+          print("loader updated, bye")
+      else
+          print("Oh dear, something went wrong (bad HTTP response code " .. response .. ").")
+          print("Please try again later; sorry for the inconvenience!")
+          os.sleep(0.1)
+      end
+  else
+      print("Oh dear, something went wrong (did not get a request handle).")
+      print("Please try again later; sorry for the inconvenience!")
+      os.sleep(0.1)
+  end
+end
+
+
+
 if arg and arg[1] then
+  if "update" == arg[1] then
+    selfUpdate(branch)
+    return
+  end
+
   branch = arg[1]
   print("loading from branch "..branch.." instead of "..default_branch)
+  
+  if arg[2] and "update" == arg[2] then
+      selfUpdate(branch)
+      return
+  end
+  
 else
   print("loading from default branch "..default_branch)
 end
