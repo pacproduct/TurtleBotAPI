@@ -8,21 +8,33 @@ end
 -- Change this to "dev" if you want to download the last development snapshot.
 -- Note that these versions may screw over your state files and be buggy, or at
 -- least not was well tested as the release versions.
-local branch = "master"
- 
+local default_branch = "master"
+local branch = default_branch
+
+
+local arg = {...}
+
+print (#arg)
+if arg and arg[1] then
+  branch = arg[1]
+  print("loading from branch "..branch.." instead of "..default_branch)
+else
+  print("loading from default branch "..default_branch)
+end
+
 -- The list of files we can fetch.
 local files = {
     {
         folder = "TBotAPI",
         name = "init.lua",
-        url = "https://raw.githubusercontent.com/pacproduct/TurtleBotAPI/master/api/TBotAPI.lua",
+        url = "https://raw.githubusercontent.com/pacproduct/TurtleBotAPI/"..branch.."/api/TBotAPI.lua",
         minify = false
     },
     {
         folder = "",
         name = "LJ",
 --        info = "This is a utility application for managing the API's internal state from the shell.",
-        url = "https://raw.githubusercontent.com/pacproduct/TurtleBotAPI/master/turtles/LumberJack.lua",
+        url = "https://raw.githubusercontent.com/pacproduct/TurtleBotAPI/"..branch.."/turtles/LumberJack.lua",
         ask = false,
         default = true,
         minify= false
