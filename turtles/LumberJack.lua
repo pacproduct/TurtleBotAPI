@@ -76,7 +76,7 @@ end
 function _step_findNextTask()
   -- First, check whether there's a chest below the turtle.
   local inspect_res, down_item = t.inspectDown()
-  if inspect_res then
+  if inspect_res and down_item.name == "minecratf:chest" then
     -- If so, unload the turtle down.
     _unloadDown()
   end
@@ -279,12 +279,13 @@ end
 --   Optional. Defaults to the global target_fuel variable.
 -- Returns false if it could not reach target minimum fuel.
 function _refuelIfNeeded(target_num_fuel_units)
+  print("Fuel level: " .. t.getFuelLevel())
   if target_num_fuel_units == nil then
     target_num_fuel_units = target_fuel
   end
   
   -- Check whether or not we need to try refueling, based on last fuel check level.
-  if last_fuel_check_level ~= "unlimited" and (last_fuel_check_level == nil or (last_fuel_check_level - t.getFuelLevel()) >= fuel_check_window) then
+  if last_fuel_check_level ~= "unlimited" and (last_fuel_check_level == nil or last_fuel_check_level < fuel_check_window or (last_fuel_check_level - t.getFuelLevel()) >= fuel_check_window) then
     local refuel_res = TBotAPI.checkAndRefuel(target_num_fuel_units, refuel_items_to_ignore)
     last_fuel_check_level = t.getFuelLevel()
     
