@@ -1,7 +1,7 @@
 -- LumberJack script.
 -- This program requires the TBotAPI software.
 
-local version = "1.1.1"
+local version = "1.1.3"
 print("LumberJack v" .. version)
 print()
 
@@ -51,10 +51,13 @@ function runCycle()
     -- No fuel even after a refuel? We're doomed.
     -- Bail.
     local fuelLevel = t.getFuelLevel()
-    if fuelLevel ~= "unlimited" and fuelLevel < 1 then
+    while fuelLevel ~= "unlimited" and fuelLevel < 1 do
       print("Damn it, I'm out of fuel :(")
-      print("Gimme more and restart the program when you're ready...")
-      return false
+      print("Gimme more and press Enter to continue...")
+      print("Or hold Ctrl+T to terminate the program.")
+      print("[Press Enter when you're ready to carry on]")
+      read()
+      _refuelIfNeeded()
     end
     
     if step == "findNextTask" then
@@ -288,7 +291,7 @@ function _refuelIfNeeded(target_num_fuel_units)
   end
   
   -- Check whether or not we need to try refueling, based on last fuel check level.
-  if last_fuel_check_level ~= "unlimited" and (last_fuel_check_level == nil or last_fuel_check_level < fuel_check_window or (last_fuel_check_level - t.getFuelLevel()) >= fuel_check_window) then
+  if last_fuel_check_level ~= "unlimited" and (last_fuel_check_level == nil or last_fuel_check_level <= fuel_check_window or (last_fuel_check_level - t.getFuelLevel()) >= fuel_check_window) then
     local refuel_res = TBotAPI.checkAndRefuel(target_num_fuel_units, refuel_items_to_ignore)
     last_fuel_check_level = t.getFuelLevel()
     
