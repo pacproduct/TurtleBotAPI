@@ -1,21 +1,49 @@
 # TurtleBotAPI
 
-charger le "preloader" dans la turtle avec
-pastebin get zfVbYhca [nom du fichier]
+## Installation initiale
+- Charger le "preloader" dans la turtle avec :
+  <br>
+  `pastebin get zfVbYhca install`
+  
+  Note : Le dernier paramètre est le nom du fichier qui sera enregistré. Vous êtes libre de choisir un autre nom que `install`.
+  <br>
+  Le reste du document suppose que le fichier créé se nomme `install`.
 
-ensuite appeller le script lui-m�me, il fera sa propre mise � jour
-[nom du fichier]
-on peut passer un argument en option pour charger l'installeur d'une branche en particulier en donnant le nom de la branche comme premier argument
-[nom du fichier] [nom de la branche]
+- Appeller le script lui-même, il fera sa propre mise à jour :
+  <br>
+  `install`
+  
+  Par défault, la mise à jour se fera depuis la branche `master` de ce dépôt.
+  <br>
+  Cependant vous pouvez ajouter un paramètre pour indiquer depuis quelle branche mettre à jour l'installeur.
+  <br>
+  Par exemple, pour mettre à jour depuis une branche `dev` :
+  <br>
+  `install dev`
 
-par la suite faire un appel au script sans argument d�clenche le chargement de l'api
+## Suite de l'installation / Mise à jour
+A partir de ce moment, l'installeur est à jour et peut être executé pour installer tous les fichiers de la tortue la première fois, puis dès que c'est nécessaire pour les mettre à jour si besoin :
+<br>
+`install`
 
-passer un nom de branche en premier argument permet de charger l'api d'une branche sp�cifique (au lieu de "master")
-/!\ le mot "update" est r�serv� et ne sera pas identifi� comme une branche
-[nom du fichier] [nom de la branche]
+Par défault, les fichiers seront installés depuis la branche `master` de ce dépôt.
+<br>
+Passer un nom de branche en premier argument permet d'installer les fichiers depuis une autre branche.
+<br>
+Par exemple, pour installer depuis une branche `dev` :
+<br>
+`install dev`
 
-pour forcer la m-�-j du script il suffit de passer "update" en argument
-[nom du fichier] update
+**Attention :** le mot "`update`" est réservé et ne sera pas identifié comme une branche.
 
-le script de chargement peut etre m-�-j � partir d'une branche sp�cifique en utilisant "update" comme second argument
-[nom du fichier] [nom de la branche] update
+----
+
+Pour forcer la mise à jour du script d'installation lui-même, lui passer "`update`" en permier argument :
+<br>
+`install update`
+
+Le script d'installation peut être mise à jour à partir d'une branche spécifique en utilisant "`update`" comme second argument.
+<br>
+Par exemple, pour mettre à jour l'installeur depuis une branche `dev` :
+<br>
+`install dev update`
