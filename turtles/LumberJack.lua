@@ -1,6 +1,9 @@
 -- LumberJack script.
 -- This program requires the TBotAPI software.
---
+
+local version = "1.1"
+print("LumberJack v" .. version)
+print()
 
 -- SETTINGS SECTION --
 -- Minimum quantity of fuel units required before the turtle
