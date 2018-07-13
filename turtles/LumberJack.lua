@@ -283,13 +283,12 @@ function _refuelIfNeeded(target_num_fuel_units)
     target_num_fuel_units = target_fuel
   end
   
-  if last_fuel_check_level == nil then
-    last_fuel_check_level = t.getFuelLevel()
-  end
-  
   -- Check whether or not we need to try refueling, based on last fuel check level.
-  if last_fuel_check_level ~= "unlimited" and (last_fuel_check_level - t.getFuelLevel()) >= fuel_check_window then
-    return TBotAPI.checkAndRefuel(target_num_fuel_units, refuel_items_to_ignore)
+  if last_fuel_check_level ~= "unlimited" and (last_fuel_check_level == nil or (last_fuel_check_level - t.getFuelLevel()) >= fuel_check_window) then
+    local refuel_res = TBotAPI.checkAndRefuel(target_num_fuel_units, refuel_items_to_ignore)
+    last_fuel_check_level = t.getFuelLevel()
+    
+    return refuel_res
   else
     return true
   end
