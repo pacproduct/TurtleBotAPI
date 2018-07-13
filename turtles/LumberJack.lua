@@ -1,7 +1,7 @@
 -- LumberJack script.
 -- This program requires the TBotAPI software.
 
-local version = "1.1"
+local version = "1.1.1"
 print("LumberJack v" .. version)
 print()
 
@@ -79,7 +79,7 @@ end
 function _step_findNextTask()
   -- First, check whether there's a chest below the turtle.
   local inspect_res, down_item = t.inspectDown()
-  if inspect_res and down_item.name == "minecratf:chest" then
+  if inspect_res and down_item.name == "minecraft:chest" then
     -- If so, unload the turtle down.
     _unloadDown()
   end
@@ -113,7 +113,7 @@ function _step_findNextTask()
       return "unloadFront"
     end
   else
-    TBotAPI.moveF()
+    _suckAndMoveF()
   end
   
   return "findNextTask"
