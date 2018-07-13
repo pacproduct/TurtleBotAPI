@@ -1,7 +1,7 @@
 -- LumberJack script.
 -- This program requires the TBotAPI software.
 
-local version = "1.1.3"
+local version = "1.1.4"
 print("LumberJack v" .. version)
 print()
 
@@ -56,8 +56,11 @@ function runCycle()
       print("Gimme more and press Enter to continue...")
       print("Or hold Ctrl+T to terminate the program.")
       print("[Press Enter when you're ready to carry on]")
+      
       read()
+      
       _refuelIfNeeded()
+      fuelLevel = t.getFuelLevel()
     end
     
     if step == "findNextTask" then
