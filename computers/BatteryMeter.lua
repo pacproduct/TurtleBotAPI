@@ -11,6 +11,7 @@
 - % restant
 - gérer les couleurs de texte (pour le %: rouge, jaune, vert)
 
+- centrer le texte
 
 
 ]]
@@ -36,6 +37,7 @@ local tmp_data
 
 local monitor
 local monitor_width, monitor_height
+local pos_y
 local battery_data_color
 
 
@@ -63,9 +65,9 @@ function round(num)
   return math.floor(num + 0.5)
 end
 
-function newLine(mon, mon_height)
+function newLine(mon, pos_y)
   mon.scroll(1)
-  mon.setCursorPos(1,mon_height)
+  mon.setCursorPos(1, pos_y)
 end
 
 
@@ -106,6 +108,9 @@ while true do
     percent = round((total_stored/total_capacity)*10000)/100
   end
   
+  total_capacity = tostring(total_capacity)
+  total_stored =  tostring(total_stored)
+  
   print("total capacity : "..total_capacity)
   print("total stored   : "..total_stored)
   print("percent        : "..percent.."%")
@@ -117,17 +122,32 @@ while true do
   if monitor then
     print("monitor found")
     
-    battery_data_color = 2
-    if percent>80 then
-      battery_data_color = 32
+    battery_data_color = 2 -- orange
+    if percent>50 then
+      battery_data_color = 32 -- vert
     end
     if percent<20 then
-      battery_data_color = 16384
+      battery_data_color = 16384 -- rouge
     end
     
+    local scale_not_found = true
+    local monitor_scale = 5
     
-    monitor.setTextScale(2) -- 1-5
-    monitor_width, monitor_height = monitor.getSize() -- tied to TextScale!
+    while scale_not_found and monitor_scale>1 do
+      monitor.setTextScale(monitor_scale) -- 1-5
+      monitor_width, monitor_height = monitor.getSize() -- tied to TextScale!
+      --print("width: "..monitor_width.." | height"..monitor_height)
+      if monitor_height<4 or monitor_width<string.len("total capacity : "..total_capacity) then
+        -- print(monitor_scale.." too high")
+        monitor_scale = monitor_scale - 1
+      else
+        -- print(monitor_scale.." ok")
+        scale_not_found = false
+      end
+      
+    end
+    monitor.setTextScale(monitor_scale)
+    monitor_width, monitor_height = monitor.getSize()
     
     --[[
     if string.len(txt[i]) > X then
@@ -136,28 +156,28 @@ while true do
     end
     ]]
     
+    pos_y = monitor_height-(monitor_height-4)/2
+        
     monitor.setBackgroundColor(32768)
     monitor.clear()
-    -- monitor.setTextScale(2)
-    newLine(monitor, monitor_height)
+    newLine(monitor, pos_y)
     monitor.setTextColor(1)
-    monitor.write("total capacity : ")
-    -- monitor.setTextColor(battery_data_color)
+    monitor.write("Total capacity : ")
     monitor.write(total_capacity)
     
-    newLine(monitor, monitor_height)
+    newLine(monitor, pos_y)
     monitor.setTextColor(1)
-    monitor.write("total stored   : ")
+    monitor.write("Total stored   : ")
     monitor.setTextColor(battery_data_color)    
     monitor.write(total_stored)
-    newLine(monitor, monitor_height)
+    newLine(monitor, pos_y)
     monitor.setTextColor(1)
-    monitor.write("percent        : ")
+    monitor.write("Percent        : ")
     monitor.setTextColor(battery_data_color)
     monitor.write(percent)
     monitor.setTextColor(1)
     monitor.write("%")
-    newLine(monitor, monitor_height)
+    newLine(monitor, pos_y)
     
     if 1 == network_error then
       monitor.setTextColor(16384)
@@ -167,6 +187,6 @@ while true do
     
   end
   
-  os.sleep(10)
+  os.sleep(1)
   
 end
