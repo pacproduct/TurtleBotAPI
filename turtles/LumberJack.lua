@@ -1,14 +1,21 @@
 -- LumberJack script.
 -- This program requires the TBotAPI software.
---
+
+local version = "1.1.4"
+print("LumberJack v" .. version)
+print()
 
 -- SETTINGS SECTION --
 -- Minimum quantity of fuel units required before the turtle
 -- accepts to start the job.
-local init_target_fuel = 50
+local init_target_fuel = 20
 -- Minimum quantity of fuel the turtle is going to try
 -- having in stock at all times.
-local target_fuel = 100
+local target_fuel = 50
+-- Turtle will check its fuel level every X units, where X is the following value.
+local fuel_check_window = 5
+-- Fuel level during last fuel check. Used to determine whether fuel check should be done.
+local last_fuel_check_level = nil
 -- Minimum number of saplings the turtle is going to try
 -- having in stock at all times. When this number is reached,
 -- it will skip collecting them until it needs more again.
@@ -31,6 +38,8 @@ local t = turtle
 
 
 
+-- Runs through a cycle.
+-- @param 
 function runCycle()
   local step = "findNextTask"
   
@@ -38,26 +47,51 @@ function runCycle()
     print("Step '" .. step .. "'...")
     -- Refuel before each step.
     _refuelIfNeeded()
+    
+    -- No fuel even after a refuel? We're doomed.
+    -- Bail.
+    local fuelLevel = t.getFuelLevel()
+    while fuelLevel ~= "unlimited" and fuelLevel < 1 do
+      print("Damn it, I'm out of fuel :(")
+      print("Gimme more and press Enter to continue...")
+      print("Or hold Ctrl+T to terminate the program.")
+      print("[Press Enter when you're ready to carry on]")
+      
+      read()
+      
+      _refuelIfNeeded()
+      fuelLevel = t.getFuelLevel()
+    end
+    
     if step == "findNextTask" then
       step = _step_findNextTask()
     elseif step == "harvestTree" then
       step = _step_harvestTree()
     elseif step == "collectAndPlant" then
       step = _step_collectAndPlant()
-    elseif step == "unload" then
-      step = _step_unload()
-    elseif step == "unloadingEnd" then
+    elseif step == "unloadFront" then
+      step = _step_unloadFront()
+    elseif step == "turnAround" then
       _turnAround()
       step = "done"
     end
   end
   
   print("Done.")
+  
+  return true
 end
 
 function _step_findNextTask()
-  local inspect_res, front_item = t.inspect()
+  -- First, check whether there's a chest below the turtle.
+  local inspect_res, down_item = t.inspectDown()
+  if inspect_res and down_item.name == "minecraft:chest" then
+    -- If so, unload the turtle down.
+    _unloadDown()
+  end
   
+  -- Then search for next task, in front of it.
+  local inspect_res, front_item = t.inspect()
   if inspect_res then
     -- Resource is wood: harvest.
     if _in_array(front_item.name, wood_types) then
@@ -81,11 +115,11 @@ function _step_findNextTask()
       elseif (color == 'blue') then
         TBotAPI.movePlusY()
       end
-    else
-      return "unload"
+    elseif front_item.name == "minecraft:chest" then
+      return "unloadFront"
     end
   else
-    TBotAPI.moveF()
+    _suckAndMoveF()
   end
   
   return "findNextTask"
@@ -161,29 +195,63 @@ function _step_collectAndPlant()
   return "findNextTask"
 end
 
-function _step_unload()
+function _step_unloadFront()
   -- If a chest is in front, unload.
   -- Otherwise, stop the unloading and carry on immediately.
   local inspect_res, front_item = t.inspect()
   
   if not inspect_res or front_item.name ~= "minecraft:chest" then
-	return "unloadingEnd"
+	  return "turnAround"
   end
+
+  _unloadItems(false)
   
-  -- Drop all logs and apples.
-  _drop_all_items(wood_types)
-  _drop_all_items({"minecraft:apple"})
-  
-  return "unloadingEnd"
+  return "turnAround"
 end
 
--- Unloads all items of given types from the turtle, in front of it.
--- @param array item_types: List of item types to drop. Ex: {"minecraft:apple", "minecraft:sapling"}.
-function _drop_all_items(item_types)
+--[[
+  Unloads the turtle by throwing items down.
+]]
+function _unloadDown()
+  _unloadItems(true)
+end
+
+--[[
+  Unloads the turtle by throwing items.
+  @param bool dropDown: Whether resources should be dropped down or not.
+    If true, drops down. If false, drops in front of it.
+    Optional. Defaults to false.
+]]
+function _unloadItems(dropDown)
+  -- Drop all logs and apples.
+  _drop_all_items(wood_types, dropDown)
+  _drop_all_items({"minecraft:apple"}, dropDown)
+  
+  return "turnAround"
+end
+
+--[[
+  Unloads all items of given types from the turtle.
+  @param array item_types: List of item types to drop. Ex: {"minecraft:apple", "minecraft:sapling"}.
+  @param bool dropDown: Whether resources should be dropped down or not.
+    If true, drops down. If false, drops in front of it.
+    Optional. Defaults to false.
+]]
+function _drop_all_items(item_types, dropDown)
+  if dropDown == nil then
+    dropDown = false
+  end
+
   local item_slot_num = TBotAPI.searchForItemsSlot(item_types)
   while item_slot_num ~= nil do
     t.select(item_slot_num)
-    local drop_res = t.drop()
+    local drop_res = nil
+    
+    if dropDown then
+      drop_res = t.dropDown()
+    else
+      drop_res = t.drop()
+    end
     
     if not drop_res then
       break
@@ -193,8 +261,15 @@ function _drop_all_items(item_types)
   end
 end
 
+--[[
+  Moves the turtle forward and sucks everything in its way.
+  @param num_moves: Number of moves forward.
+    Optional. Defaults to 1.
+    If you set it to 0, the turtle will suck resources in front of
+    it without moving forward.
+]]
 function _suckAndMoveF(num_moves)
-  local remaining_moves = TBotAPI.clone(num_moves)
+  local remaining_moves = num_moves
   while t.suck() do end
   
   if remaining_moves == nil then
@@ -213,11 +288,20 @@ end
 --   Optional. Defaults to the global target_fuel variable.
 -- Returns false if it could not reach target minimum fuel.
 function _refuelIfNeeded(target_num_fuel_units)
+  print("Fuel level: " .. t.getFuelLevel())
   if target_num_fuel_units == nil then
     target_num_fuel_units = target_fuel
   end
   
-  return TBotAPI.checkAndRefuel(target_num_fuel_units, refuel_items_to_ignore)
+  -- Check whether or not we need to try refueling, based on last fuel check level.
+  if last_fuel_check_level ~= "unlimited" and (last_fuel_check_level == nil or last_fuel_check_level <= fuel_check_window or (last_fuel_check_level - t.getFuelLevel()) >= fuel_check_window) then
+    local refuel_res = TBotAPI.checkAndRefuel(target_num_fuel_units, refuel_items_to_ignore)
+    last_fuel_check_level = t.getFuelLevel()
+    
+    return refuel_res
+  else
+    return true
+  end
 end
 
 -- Turns the turtle around (turns it left twice).
@@ -270,6 +354,6 @@ print("Initial inventory sorting...")
 TBotAPI.groupInventoryResources()
 print("Done.")
 
-while true do
-  runCycle()
+while runCycle() do
+  -- Well... nothing to do here, waiting for the cycle to complete.
 end
