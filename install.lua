@@ -86,7 +86,7 @@ local files = {
         ask = false,
         default = true,
         minify= false
-    }
+    },
     {
         folder = "",
         name = "BM",
