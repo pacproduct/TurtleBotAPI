@@ -87,6 +87,15 @@ local files = {
         default = true,
         minify= false
     }
+    {
+        folder = "",
+        name = "BM",
+--        info = "This is a utility application for managing the API's internal state from the shell.",
+        url = "https://raw.githubusercontent.com/pacproduct/TurtleBotAPI/"..branch.."/computers/BatteryMeter.lua",
+        ask = false,
+        default = true,
+        minify= false
+    }
 --[[,
     {
         folder = "programs",

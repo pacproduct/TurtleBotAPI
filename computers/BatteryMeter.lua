@@ -1,7 +1,16 @@
 -- BatteryMeter script.
 -- lists the batteries on th network and displays their status
 
+-- save launch command for autoreboot
+local arg = {...}
 
+local program_name = shell.getRunningProgram()
+
+local autoload_string = "shell.run(\""..program_name.." "..table.concat(arg, " ").."\")"
+
+local f = fs.open("startup", "w")
+f.write(autoload_string)
+f.close()
 
 
 --[[
