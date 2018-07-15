@@ -1,7 +1,7 @@
 -- LumberJack script.
 -- This program requires the TBotAPI software.
 
-local version = "1.1.4"
+local version = "1.2.0"
 print("LumberJack v" .. version)
 print()
 
@@ -14,19 +14,30 @@ local init_target_fuel = 20
 local target_fuel = 50
 -- Turtle will check its fuel level every X units, where X is the following value.
 local fuel_check_window = 5
--- Fuel level during last fuel check. Used to determine whether fuel check should be done.
-local last_fuel_check_level = nil
 -- Minimum number of saplings the turtle is going to try
 -- having in stock at all times. When this number is reached,
--- it will skip collecting them until it needs more again.
+-- it will skip collecting them until it needs restocking again.
 local target_num_saplings = 32
 -- Wood block types to collect. Any other type would be seen as walls.
 local wood_types = {"minecraft:log", "minecraft:log2", "ic2:rubber_wood"}
 -- Sapling types to detect.
 local sapling_types = {"minecraft:sapling", "ic2:sapling"}
+-- Types of dirts for planting trees.
+local dirt_types = {"minecraft:dirt", "minecraft:grass"}
 -- Refuel items that should be ignored by the turtle when refueling.
 local refuel_items_to_ignore = sapling_types
 -- END OF SETTINGS SECTION --
+
+-- Fuel level during last fuel check. Used to determine whether fuel check should be done.
+local last_fuel_check_level = nil
+-- Whether GPS positionning is available.
+-- This gets tested when launching the program. If true, the turtle will
+-- Regularly mark checkpoints so it can get back to it in case of server restart, and
+-- continue its duty. If false, no GPS signal was found: the turtle won't restart automatically
+-- after a server failure.
+local gps_is_active = false
+-- Whether direction could be determined.
+local gps_direction_determined = false
 
 
 
@@ -42,6 +53,9 @@ local t = turtle
 -- @param 
 function runCycle()
   local step = "findNextTask"
+  
+  -- Test whether GPS is available.
+  -- If so, flag GPS as active.
   
   while step ~= "done" do
     print("Step '" .. step .. "'...")
@@ -83,11 +97,16 @@ function runCycle()
 end
 
 function _step_findNextTask()
+  local plantAfterNextMove = false
+  
   -- First, check whether there's a chest below the turtle.
   local inspect_res, down_item = t.inspectDown()
   if inspect_res and down_item.name == "minecraft:chest" then
     -- If so, unload the turtle down.
     _unloadDown()
+    -- Then, check if there is dirt below the turtle
+  elseif inspect_res and _in_array(down_item.name, dirt_types) then
+    plantAfterNextMove = true
   end
   
   -- Then search for next task, in front of it.
@@ -114,12 +133,22 @@ function _step_findNextTask()
         TBotAPI.moveMinusY()
       elseif (color == 'blue') then
         TBotAPI.movePlusY()
+        
+        if plantAfterNextMove then
+          _plantTree('below')
+          plantAfterNextMove = false
+        end
       end
     elseif front_item.name == "minecraft:chest" then
       return "unloadFront"
     end
   else
     _suckAndMoveF()
+    
+    if plantAfterNextMove then
+      _plantTree('behind')
+      plantAfterNextMove = false
+    end
   end
   
   return "findNextTask"
@@ -176,6 +205,7 @@ function _step_collectAndPlant()
       TBotAPI.turnR()
     end
     
+    _suckAndMoveF(0)
     TBotAPI.turnR()
     _suckAndMoveF(0)
   else
@@ -184,12 +214,7 @@ function _step_collectAndPlant()
   end
   
   -- Plant a tree.
-  local sapling_slot = TBotAPI.searchForItemsSlot(sapling_types)
-  if sapling_slot ~= nil then
-    t.select(sapling_slot)
-    t.place()
-  end
-  
+  _plantTree('front')
   _turnAround()
 
   return "findNextTask"
@@ -207,6 +232,35 @@ function _step_unloadFront()
   _unloadItems(false)
   
   return "turnAround"
+end
+
+--[[
+  Plants a tree behind the turtle.
+  Has no effect if it has no sapling in its inventory.
+  @param string direction: Where the tree should be planted:
+    - 'front' to plant it in front of the turtle (Default vlaue).
+    - 'behind' to plant it behind the turtle.
+    - 'below' to plant it below the turtle.
+    Optional.
+]]
+function _plantTree(where)
+  if not _in_array(where, {'front', 'below'}) then
+    behind = 'front'
+  end
+
+  local sapling_slot = TBotAPI.searchForItemsSlot(sapling_types)
+
+  if sapling_slot ~= nil then
+    t.select(sapling_slot)
+  
+    if where == 'front' then
+      t.place()
+    elseif where == 'behind' then
+      _turnAround()
+      t.place()
+      _turnAround()
+    end
+  end
 end
 
 --[[
@@ -323,6 +377,59 @@ function _in_array(needle, haystack)
   end
 
   return false
+end
+
+--[[
+  Tries retrieving its position from the GPS.
+  Warning: Takes time when no signal is found.
+  @param int timeout: The time to wait for a GPS signal before timeing out (in seconds).
+    Optional. Defaults to 2 seconds.
+  @return vector: The turtle's position as an X, Y, Z vector. Nil if getting its position failed.
+]]
+function _get_gps_position(timeout)
+  if not timeout then
+    timeout = 2
+  end
+  
+  local x, y, z = gps.locate(timeout)
+  if not x then
+    return nil
+  else
+    return vector.new(x, y, z)
+  end
+end
+
+--[[
+  Saves current turtle's position, by retrieving its GPS position.
+  If it fails, returns false.
+  @return bool: True if saving the checkpoint succeeded. False otherwise.
+]]
+function _save_gps_checkpoint()
+  local gps_pos = _get_gps_position()
+  
+  if gps_pos ~= nil then
+    TBotAPI.writePersistentData("checkpoint_x", var)
+    TBotAPI.writePersistentData("checkpoint_y", var)
+    TBotAPI.writePersistentData("checkpoint_z", var)
+  end
+end
+
+--[[
+  Persists a variable to disk.
+  @param string name: Variable name. Must be filename compliant.
+  @param value: The value to store.
+]]
+function _write_persistent_data(name, value)
+  TBotAPI.writePersistentData("LumberJack." .. name, value)
+end
+
+--[[
+  Reads a variable from disk.
+  @param string name: Variable name. Must be filename compliant.
+  @return value: The sought value.
+]]
+function _read_persistent_data(name)
+  return TBotAPI.readPersistentData("LumberJack." .. name)
 end
 
 
