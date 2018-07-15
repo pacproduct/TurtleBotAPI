@@ -1,7 +1,7 @@
 -- LumberJack script.
 -- This program requires the TBotAPI software.
 
-local version = "1.2.1"
+local version = "1.2.2"
 print("LumberJack v" .. version)
 print()
 
@@ -38,9 +38,8 @@ local last_fuel_check_level = nil
 local gps_is_active = false
 -- Whether direction could be determined.
 local gps_direction_determined = false
--- Whether the turtle detected some dirt below it, meaning a tree should be planted
--- here after its next move.
-local plant_after_next_move = false
+
+
 
 
 os.loadAPI("TBotAPI/init.lua")
@@ -98,6 +97,10 @@ function runCycle()
 end
 
 function _step_findNextTask()
+  -- Whether the turtle detected some dirt below it, meaning a tree should be planted
+  -- here after its next move.
+  local plant_after_next_move = false
+
   -- First, check whether there's a chest below the turtle.
   local inspect_res, down_item = t.inspectDown()
   if inspect_res and down_item.name == "minecraft:chest" then
@@ -243,7 +246,7 @@ end
     Optional.
 ]]
 function _plantTree(where)
-  if not _in_array(where, {'front', 'below'}) then
+  if not _in_array(where, {'front', 'behind', 'below'}) then
     behind = 'front'
   end
 
@@ -258,6 +261,8 @@ function _plantTree(where)
       _turnAround()
       t.place()
       _turnAround()
+    elseif where == 'below' then
+      t.placeDown()
     end
   end
 end
