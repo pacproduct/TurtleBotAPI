@@ -4,8 +4,6 @@
 -- os.loadAPI("TBotAPI.lua");
 
 
--- test aymeric
-
 -- #### CONSTANTS & Global variables ####
 
 -- Debugging purpose variable only.
@@ -21,6 +19,13 @@ local PERSISTENT_DATA_DIR_PATH = "/TBotData"
 
 local t = turtle
 local v = vector
+
+
+-- #### Sub-APIS ####
+-- Utility functions.
+util = {}
+-- Persistent data store functions.
+store = {}
 
 
 
@@ -63,9 +68,6 @@ end
 --        given, defaults to 1 so that the turtle retries only once.
 -- @return int: The number of tries to use.
 function default_num_tries(num_tries, default)
-  local nnum_tries = clone(num_tries)
-  local default = clone(default)
-
   if default == nil then
     default = 1
   end
@@ -153,14 +155,16 @@ function writePersistentData(name, value, overwrite)
 end
 
 -- Returns the value of a persistent variable.
-function readPersistentData(name)
+-- @param string name: Variable's name to read. Must be a valid file name.
+-- @param string default: Default value to return if variable does not exist.
+function readPersistentData(name, default)
   local file_path = nil
-  
+
   if name ~= nil then
     file_path = getDataDirPath() .. "/" .. name
   else
-    -- Given name is nil: There's nothing we can do with it...
-    return nil
+    -- Given name is nil: Return default value.
+    return default
   end
   
   -- Retrieve data:
@@ -172,8 +176,8 @@ function readPersistentData(name)
     
     return value
   else
-    -- Something wrong happened when reading the file, return nil:
-    return nil
+    -- Something wrong happened when reading the file, return default value:
+    return default
   end
 end
 
@@ -187,7 +191,7 @@ end
 -- initialiazed with its actual coordinates!
 -- @return vector: Current direction: 0, 1, 2, 3.
 --         If not data was found, will return 0 by default.
-function getDir()
+function getFacingDirection()
   local dir = readPersistentData("dir")
   
   if dir == nil then
@@ -197,13 +201,13 @@ function getDir()
   return tonumber(dir)
 end
 
-function setDir(dir)
+function setPersistentDirection(dir)
   writePersistentData("dir", dir % 4)
 end
 
-function addToDir(var)
-  local dir = getDir()
-  setDir(dir + var)
+function addToPersistentDirection(var)
+  local dir = getFacingDirection()
+  setPersistentDirection(dir + var)
 end
 
 -- Returns the current position of the turtle.
@@ -211,47 +215,47 @@ end
 -- initialiazed with its actual coordinates!
 -- @return vector: Current position.
 --         If not data was found, will return (0, 0, 0) by default.
-function getPos()
+function getPosition()
   local pos = v.new(
-    readPersistentData("pos_x"),
-    readPersistentData("pos_y"),
-    readPersistentData("pos_z")
+    readPersistentData("pos_x", 0),
+    readPersistentData("pos_y", 0),
+    readPersistentData("pos_z", 0)
   )
 
   return pos
 end
 
-function setPosX(var)
+function setPersistentPositionX(var)
   writePersistentData("pos_x", var)
 end
 
-function setPosY(var)
+function setPersistentPositionY(var)
   writePersistentData("pos_y", var)
 end
 
-function setPosZ(var)
+function setPersistentPositionZ(var)
   writePersistentData("pos_z", var)
 end
 
-function setPos(pos)
-  setPosX(pos.x)
-  setPosY(pos.y)
-  setPosZ(pos.z)
+function setPersistentPosition(pos)
+  setPersistentPositionX(pos.x)
+  setPersistentPositionY(pos.y)
+  setPersistentPositionZ(pos.z)
 end
 
-function addToPosX(var)
-  local pos = getPos()
-  setPosX(pos.x + var)
+function addToPersistentPositionX(var)
+  local pos = getPosition()
+  setPersistentPositionX(pos.x + var)
 end
 
-function addToPosY(var)
-  local pos = getPos()
-  setPosY(pos.y + var)
+function addToPersistentPositionY(var)
+  local pos = getPosition()
+  setPersistentPositionY(pos.y + var)
 end
 
-function addToPosZ(var)
-  local pos = getPos()
-  setPosZ(pos.z + var)
+function addToPersistentPositionZ(var)
+  local pos = getPosition()
+  setPersistentPositionZ(pos.z + var)
 end
 
 -- Sets the tracking status.
@@ -283,7 +287,7 @@ function track()
     return
   end
   
-  local pos = getPos()
+  local pos = getPosition()
   writePersistentData("tracker", pos.x .. "," .. pos.y .. "," .. pos.z .. "\n", false)
 end
 
@@ -304,13 +308,13 @@ end
 -- Simply wraps turtle.turnLeft().
 function turnL()
   t.turnLeft()
-  addToDir(-1)
+  addToPersistentDirection(-1)
 end
 
 -- Simply wraps turtle.turnRight().
 function turnR()
   t.turnRight()
-  addToDir(1)
+  addToPersistentDirection(1)
 end
 
 -- Simply wraps turtle.forward().
@@ -331,15 +335,15 @@ function moveF(num_tries)
   
   if result then
     -- The move was successfull, update position:
-    local dir = getDir()
+    local dir = getFacingDirection()
     if dir == 0 then
-      addToPosZ(-1)
+      addToPersistentPositionZ(-1)
     elseif dir == 1 then
-      addToPosX(1)
+      addToPersistentPositionX(1)
     elseif dir == 2 then
-      addToPosZ(1)
+      addToPersistentPositionZ(1)
     else
-      addToPosX(-1)
+      addToPersistentPositionX(-1)
     end
     
     -- Track movement:
@@ -366,7 +370,7 @@ function movePlusY(num_tries)
   end
   
   if result then
-    addToPosY(1)
+    addToPersistentPositionY(1)
     
     -- Track movement:
     track()
@@ -392,7 +396,7 @@ function moveMinusY(num_tries)
   end
   
   if result then
-    addToPosY(-1)
+    addToPersistentPositionY(-1)
     
     -- Track movement:
     track()
@@ -468,7 +472,7 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if success. Else false.
 function movePlusX(num_tries)
-  face(1)
+  faceDirection(1)
   return moveF(num_tries)
 end
 
@@ -477,7 +481,7 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if success. Else false.
 function moveMinusX(num_tries)
-  face(3)
+  faceDirection(3)
   return moveF(num_tries)
 end
 
@@ -486,7 +490,7 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if success. Else false.
 function movePlusZ(num_tries)
-  face(2)
+  faceDirection(2)
   return moveF(num_tries)
 end
 
@@ -495,19 +499,15 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if success. Else false.
 function moveMinusZ(num_tries)
-  face(0)
+  faceDirection(0)
   return moveF(num_tries)
 end
 
 -- Turns to face given direction.
 -- @param int dir: Direction to face: 0, 1, 2, 3.
-function face(dir)
-  -- Duplicate parameters so we don't modify them:
-  local dir = round(clone(dir))
-  -- --
-
+function faceDirection(dir)
   -- Compute actions to make:
-  local actions = dir - getDir()
+  local actions = dir - getFacingDirection()
 
   -- Make sure we take the most efficient way (ex: do -1 instead of +3):
   if actions > 2 then
@@ -534,9 +534,7 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if the move was successful. Else false.
 function moveX(dist, num_tries)
-  -- Duplicate parameters so we don't modify them:
-  local dist = round(clone(dist))
-  -- --
+  dist = round(dist)
   
   local move_sign = 1
   if dist < 0 then
@@ -569,10 +567,6 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if the move was successful. Else false.
 function moveY(dist, num_tries)
-  -- Duplicate parameters so we don't modify them:
-  local dist = round(clone(dist))
-  -- --
-
   dist = round(dist)
   
   local move_sign = 1
@@ -606,9 +600,7 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if the move was successful. Else false.
 function moveZ(dist, num_tries)
-  -- Duplicate parameters so we don't modify them:
-  local dist = round(clone(dist))
-  -- --
+  dist = round(dist)
 
   local move_sign = 1
   if dist < 0 then
@@ -641,7 +633,7 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if the move was successful. Else false.
 function move(vect, num_tries)
-  -- Duplicate parameters so we don't modify them:
+  -- Duplicate some parameters so we don't modify them:
   local vect = clone(vect)
   -- --
   
@@ -672,7 +664,7 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if the move was successful. Else false.
 function moveTo(dest, num_tries)
-  -- Duplicate parameters so we don't modify them:
+  -- Duplicate some parameters so we don't modify them:
   local dest = clone(dest)
   -- --
   
@@ -682,7 +674,7 @@ function moveTo(dest, num_tries)
   dest.z = round(dest.z)
   
   -- Compute relative movement vector to apply:
-  local vect = v.new(dest.x, dest.y, dest.z) - getPos()
+  local vect = v.new(dest.x, dest.y, dest.z) - getPosition()
   
   -- Go:
   return move(vect, num_tries)
@@ -748,12 +740,10 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if the operation was successful. Else false.
 function excavateX(dist, num_tries)
-  -- Duplicate parameters so we don't modify them:
-  local dist = round(clone(dist))
-  local num_tries = default_num_tries(num_tries)
-  -- --
-  
-  local cur_num_tries = clone(num_tries)
+  dist = round(dist)
+  num_tries = default_num_tries(num_tries)
+
+  local cur_num_tries = num_tries
   
   local move_sign = 1
   if dist < 0 then
@@ -761,7 +751,7 @@ function excavateX(dist, num_tries)
   end
   
   dist = math.abs(dist) - 1
-  face(move_sign)
+  faceDirection(move_sign)
   
   local successful_move = false
   while dist > 0 do
@@ -794,12 +784,10 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if the operation was successful. Else false.
 function excavateY(dist, num_tries)
-  -- Duplicate parameters so we don't modify them:
-  local dist = round(clone(dist))
-  local num_tries = default_num_tries(num_tries)
-  -- --
+  dist = round(dist)
+  num_tries = default_num_tries(num_tries)
   
-  local cur_num_tries = clone(num_tries)
+  local cur_num_tries = num_tries
   
   local move_sign = 1
   if dist < 0 then
@@ -846,12 +834,10 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if the operation was successful. Else false.
 function excavateZ(dist, num_tries)
-  -- Duplicate parameters so we don't modify them:
-  local dist = round(clone(dist))
-  local num_tries = default_num_tries(num_tries)
-  -- --
+  dist = round(dist)
+  num_tries = default_num_tries(num_tries)
   
-  local cur_num_tries = clone(num_tries)
+  local cur_num_tries = num_tries
 
   local move_sign = 1
   if dist < 0 then
@@ -859,7 +845,7 @@ function excavateZ(dist, num_tries)
   end
   
   dist = math.abs(dist) - 1
-  face(move_sign + 1)
+  faceDirection(move_sign + 1)
   
   local successful_move = false
   while dist > 0 do
@@ -892,10 +878,8 @@ end
 --        giving up. See default_num_tries() for further details.
 -- @return bool: true if the operation was successful. Else false.
 function excavatePlan(x, z, num_tries)
-  -- Duplicate parameters so we don't modify them:
-  local x = round(clone(x))
-  local z = round(clone(z))
-  -- --
+  x = round(x)
+  z = round(z)
 
   local move_x_sign = 1
   
@@ -947,9 +931,8 @@ end
 --               Note that if excavating succeeded but returning to start
 --               position failed, it would return true nevertheless.
 function excavate(volume, go_back, num_tries)
-  -- Duplicate parameters so we don't modify them:
+  -- Duplicate some parameters so we don't modify them:
   local volume = clone(volume)
-  local go_back = clone(go_back)
   -- --
   
   volume.x = round(volume.x)
@@ -957,7 +940,7 @@ function excavate(volume, go_back, num_tries)
   volume.z = round(volume.z)
   
   -- Save current position:
-  local start_pos = getPos()
+  local start_pos = getPosition()
 
   local move_y_sign = 1
   if volume.y < 0 then
@@ -972,7 +955,7 @@ function excavate(volume, go_back, num_tries)
     -- Compute directions to apply to the next plan excavation:
     local move_plan_sign_x = 1
     local move_plan_sign_z = 1
-    local cur_pos = getPos()
+    local cur_pos = getPosition()
     if start_pos.x ~= cur_pos.x then
       move_plan_sign_x = -1
     end
@@ -1008,7 +991,7 @@ function excavate(volume, go_back, num_tries)
   
   -- Get back to initial position if asked to do so:
   if go_back then
-    local end_pos = getPos()
+    local end_pos = getPosition()
     
     -- First go back to Y position:
     moveY(start_pos.y - end_pos.y, num_tries)
