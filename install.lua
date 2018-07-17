@@ -95,6 +95,15 @@ local files = {
         ask = false,
         default = true,
         minify= false
+    },
+    {
+        folder = "",
+        name = "CM",
+--        info = "This is a utility application for managing the API's internal state from the shell.",
+        url = "https://raw.githubusercontent.com/pacproduct/TurtleBotAPI/"..branch.."/computers/ChestMeter.lua",
+        ask = false,
+        default = true,
+        minify= false
     }
 --[[,
     {
