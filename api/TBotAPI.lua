@@ -213,9 +213,9 @@ end
 --         If not data was found, will return (0, 0, 0) by default.
 function getPos()
   local pos = v.new(
-    readPersistentData("pos_x"),
-    readPersistentData("pos_y"),
-    readPersistentData("pos_z")
+    readPersistentData("pos_x", 0),
+    readPersistentData("pos_y", 0),
+    readPersistentData("pos_z", 0)
   )
 
   return pos
