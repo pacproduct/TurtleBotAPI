@@ -1,7 +1,7 @@
 -- LumberJack script.
 -- This program requires the TBotAPI software.
 
-local version = "1.2.2"
+local version = "1.2.7"
 print("LumberJack v" .. version)
 print()
 
@@ -26,18 +26,14 @@ local sapling_types = {"minecraft:sapling", "ic2:sapling"}
 local dirt_types = {"minecraft:dirt", "minecraft:grass"}
 -- Refuel items that should be ignored by the turtle when refueling.
 local refuel_items_to_ignore = sapling_types
+-- Maximum position shift between 2 restarts of the program.
+-- Used to detect if the turtle was moved between 2 starts, so
+-- it knows it should retart the cycle from scratch.
+local max_allowed_start_position_shift = 2
 -- END OF SETTINGS SECTION --
 
 -- Fuel level during last fuel check. Used to determine whether fuel check should be done.
 local last_fuel_check_level = nil
--- Whether GPS positionning is available.
--- This gets tested when launching the program. If true, the turtle will
--- Regularly mark checkpoints so it can get back to it in case of server restart, and
--- continue its duty. If false, no GPS signal was found: the turtle won't restart automatically
--- after a server failure.
-local gps_is_active = false
--- Whether direction could be determined.
-local gps_direction_determined = false
 
 
 
@@ -50,15 +46,19 @@ local t = turtle
 
 
 -- Runs through a cycle.
--- @param 
-function runCycle()
+-- @param String|nil start_step: The starting step to run with.
+--   If nil, runs the cycle from the start.
+function runCycle(start_step)
   local step = "findNextTask"
   
-  -- Test whether GPS is available.
-  -- If so, flag GPS as active.
+  if start_step ~= nil then
+    step = start_step
+  end
   
   while step ~= "done" do
     print("Step '" .. step .. "'...")
+    _write_persistent_data("current_step", step)
+    
     -- Refuel before each step.
     _refuelIfNeeded()
     
@@ -102,31 +102,31 @@ function _step_findNextTask()
   local plant_after_next_move = false
 
   -- First, check whether there's a chest below the turtle.
-  local inspect_res, down_item = t.inspectDown()
-  if inspect_res and down_item.name == "minecraft:chest" then
+  local inspect_res, item_down = t.inspectDown()
+  if inspect_res and item_down.name == "minecraft:chest" then
     -- If so, unload the turtle down.
     _unloadDown()
     -- Then, check if there is dirt below the turtle
-  elseif inspect_res and _in_array(down_item.name, dirt_types) then
+  elseif inspect_res and _in_array(item_down.name, dirt_types) then
     plant_after_next_move = true
   end
   
   -- Then search for next task, in front of it.
-  local inspect_res, front_item = t.inspect()
+  local inspect_res, item_front = t.inspect()
   if inspect_res then
     -- Resource is wood: harvest.
-    if _in_array(front_item.name, wood_types) then
+    if _in_array(item_front.name, wood_types) then
       return "harvestTree"
     
     -- Resource is sapling: Wait for it to grow.
-    elseif _in_array(front_item.name, sapling_types) then
+    elseif _in_array(item_front.name, sapling_types) then
       -- Wait a bit until trying again. We're basically waiting for the sapling
       -- to grow.
       os.sleep(5)
     
     -- Resource is wool: React to it by changing direction.
-    elseif front_item.name == 'minecraft:wool' then
-      local color = front_item.state.color
+    elseif item_front.name == 'minecraft:wool' then
+      local color = item_front.state.color
       if (color == 'red') then
         TBotAPI.turnL()
       elseif (color == 'green') then 
@@ -141,8 +141,12 @@ function _step_findNextTask()
           plant_after_next_move = false
         end
       end
-    elseif front_item.name == "minecraft:chest" then
+    elseif item_front.name == "minecraft:chest" then
       return "unloadFront"
+      
+      -- Resource in front is unkknown: Turn around.
+    else
+      return "turnAround"
     end
   else
     _suckAndMoveF()
@@ -157,29 +161,14 @@ function _step_findNextTask()
 end
 
 function _step_harvestTree()
-  -- Organize inventory to ensure ther's space for wood.
+  -- Organize inventory to ensure there's space for wood.
   TBotAPI.groupInventoryResources()
   
   -- Dig tree.
   TBotAPI.dig()
   TBotAPI.moveF()
   
-  local inspect_res, up_item = t.inspectUp()
-  while inspect_res and _in_array(up_item.name, wood_types) do
-    TBotAPI.digU()
-    TBotAPI.movePlusY()
-    
-    inspect_res, up_item = t.inspectUp()
-  end
-
-  -- Get back down.
-  local inspect_res, down_item = t.inspectDown()
-  while not inspect_res do
-    TBotAPI.moveMinusY()
-    
-    inspect_res, down_item = t.inspectDown()
-  end
-
+  _harvestTreeUpAndGetBackDown()
   return "collectAndPlant"
 end
 
@@ -218,6 +207,9 @@ function _step_collectAndPlant()
   -- Plant a tree.
   _plantTree('front')
   _turnAround()
+  
+  -- Add a checkpoint!
+  _save_checkpoint_and_start_tracking()
 
   return "findNextTask"
 end
@@ -225,15 +217,76 @@ end
 function _step_unloadFront()
   -- If a chest is in front, unload.
   -- Otherwise, stop the unloading and carry on immediately.
-  local inspect_res, front_item = t.inspect()
+  local inspect_res, item_front = t.inspect()
   
-  if not inspect_res or front_item.name ~= "minecraft:chest" then
+  if not inspect_res or item_front.name ~= "minecraft:chest" then
 	  return "turnAround"
   end
 
   _unloadItems(false)
   
   return "turnAround"
+end
+
+-- Specifically used by the resume feature, as stopping the server while
+-- a turtle was harvesting a tree needs a special behavior.
+-- @return String: What the next step should be.
+function _resumeHarvestingTree()
+  -- Wood in front? Back to normal process.
+  local inspect_res, item_front = t.inspect()
+  if inspect_res and _in_array(item_front.name, wood_types) then
+    return "harvestTree"
+  end
+
+  -- Organize inventory to ensure there's space for wood.
+  TBotAPI.groupInventoryResources()
+  
+  -- Wood above? Harvest it.
+  local inspect_res, item_up = t.inspectUp()
+  if inspect_res and _in_array(item_up.name, wood_types) then
+    _harvestTreeUpAndGetBackDown()
+    return "collectAndPlant"
+  end
+  
+  -- Go up.
+  TBotAPI.movePlusY()
+  
+  -- Wood above? Harvest it.
+  local inspect_res, item_up = t.inspectUp()
+  if inspect_res and _in_array(item_up.name, wood_types) then
+    _harvestTreeUpAndGetBackDown()
+    return "collectAndPlant"
+  end
+  
+  -- No wood found? We probably were done harvesting it.
+  -- Get back down and carry on.
+  _goDownToTheGround()
+  return "collectAndPlant"
+end
+
+-- Harvests the tree up the turtle.
+-- Then gets back down.
+function _harvestTreeUpAndGetBackDown()
+  local inspect_res, item_up = t.inspectUp()
+  while inspect_res and _in_array(item_up.name, wood_types) do
+    TBotAPI.digU()
+    TBotAPI.movePlusY()
+    
+    inspect_res, item_up = t.inspectUp()
+  end
+
+  -- Get back down.
+  _goDownToTheGround()
+end
+
+-- Go down until something is detected below the turtle.
+function _goDownToTheGround()
+  local inspect_res, item_down = t.inspectDown()
+  while not inspect_res do
+    TBotAPI.moveMinusY()
+    
+    inspect_res, item_down = t.inspectDown()
+  end
 end
 
 --[[
@@ -404,24 +457,44 @@ function _get_gps_position(timeout)
 end
 
 --[[
-  Saves current turtle's position, by retrieving its GPS position.
-  If it fails, returns false.
-  @return bool: True if saving the checkpoint succeeded. False otherwise.
+  Restarts tracking turtle's movements and initial direction.
+  Saved data is useful for resuming a job after a server restart.
 ]]
-function _save_gps_checkpoint()
-  local gps_pos = _get_gps_position()
+function _save_checkpoint_and_start_tracking()
+  -- Enable tracking.
+  TBotAPI.setTrackerStatus(true)
+  -- Clear tracking.
+  TBotAPI.clearTracker()
   
-  if gps_pos ~= nil then
-    TBotAPI.writePersistentData("checkpoint_x", var)
-    TBotAPI.writePersistentData("checkpoint_y", var)
-    TBotAPI.writePersistentData("checkpoint_z", var)
+  -- Save current direction.
+  _write_persistent_data("checkpoint_direction", TBotAPI.getDir())
+end
+
+--[[
+  Moves the turtle back to its last checkpoint, following its trail back.
+  Puts it in its initial direction too.
+]]
+function _get_back_to_last_checkpoint()
+  TBotAPI.getBack()
+  local dir = _read_persistent_data("checkpoint_direction")
+  
+  if dir then
+    TBotAPI.face(dir)
   end
+end
+
+--[[
+  Clears out any persistent data this turtle had written to disk.
+]]
+function _clear_persistent_data()
+  _write_persistent_data("checkpoint_direction", nil)
+  _write_persistent_data("current_step", nil)
 end
 
 --[[
   Persists a variable to disk.
   @param string name: Variable name. Must be filename compliant.
-  @param value: The value to store.
+  @param value: The value to store. Nil to delete it.
 ]]
 function _write_persistent_data(name, value)
   TBotAPI.writePersistentData("LumberJack." .. name, value)
@@ -434,6 +507,142 @@ end
 ]]
 function _read_persistent_data(name)
   return TBotAPI.readPersistentData("LumberJack." .. name)
+end
+
+--[[
+  Tries receiving GPS position.
+  If it succeeds, tries to find out direction.
+  If everything succeeds, initialize de TBotAPI with these.
+  @return bool: True if everything went well.
+]]
+function _gps_initialization()
+  print("Trying to get a GPS fix...")
+  
+  local gps_pos = _get_gps_position()
+  local gps_pos2 = nil
+  
+  if gps_pos == nil then
+    print("Failed.")
+    return false
+  end
+  
+  -- Persist position.
+  TBotAPI.setPos(gps_pos)
+  
+  -- Tries finding out direction.
+  local turns = 0
+  
+  -- Tries all 4 directions before giving up.
+  for i=1,4 do
+    local move_res = turtle.forward()
+    
+    if move_res then
+      gps_pos2 = _get_gps_position()
+      turtle.back()
+      break
+    end
+
+    turtle.turnRight()
+    turns = turns + 1
+  end
+  
+  -- Restore origin direction.
+  local restore_turns = turns
+  if restore_turns > 0 and restore_turns < 4 then
+    while restore_turns > 0 do
+      turtle.turnLeft()
+      restore_turns = restore_turns - 1
+    end
+  end
+  
+  -- Did we get a second position?
+  -- If not, bail.
+  if gps_pos2 == nil then
+    print("Failed.")
+    return false
+  end
+  
+  -- Second position found. Yay. Deduct direction.
+  local move_vector = gps_pos2 - gps_pos
+  local final_direction = nil
+  if move_vector.z == -1 then
+    -- north
+    final_direction = 0
+  elseif move_vector.z == 1 then
+    -- south
+    final_direction = 2
+  elseif move_vector.x == -1 then
+    -- west
+    final_direction = 3
+  elseif move_vector.x == 1 then
+    -- east
+    final_direction = 1
+  end
+  
+  -- Compute direction based on var "turns".
+  final_direction = (final_direction - turns) % 4
+  -- Persist direction.
+  TBotAPI.setDir(final_direction)
+  
+  print("Success.")
+  return true
+end
+
+-- Resume activitie.
+-- @return String|nil: Name of the next step to run.
+--   Returns nil if the next cycle should start from the begining.
+function _resumeActivities()
+  local last_step = _read_persistent_data("current_step")
+  local next_step = nil
+  if last_step == "harvestTree" then
+    next_step = _resumeHarvestingTree()
+  end
+  
+  -- Retrieve last known position.
+  local last_pos = TBotAPI.getPos()
+  
+  -- Tries initializing GPS.
+  local gps_init_res = _gps_initialization()
+  
+  -- No fix? Issue a warning.
+  if not gps_init_res then
+    print("WARNING: Could not get a GPS fix!")
+    print("The turtle might be out of sync.")
+    os.sleep(2)
+    
+  -- We got a fix. Test whether the new position matches (or at
+  -- least isn't far from) the new one.
+  else
+    local new_pos = TBotAPI.getPos()
+    pos_diff = new_pos - last_pos
+  
+    -- If position shifted too much, do not attempt to get back to latest
+    -- checkpoint. Issue a Warning and start over.
+    if pos_diff:length() > max_allowed_start_position_shift then
+      print("WARNING: Looks like the turtle was moved!")
+      print("Or maybe you're running it for the first time.")
+      print("The programm will now start from the beginning.")
+      
+      -- Clear tracker as we want to strat clean.
+      TBotAPI.clearTracker()
+      
+      os.sleep(2)
+      return nil
+    end
+  end
+  
+  -- We have no next step for carrying on.
+  -- We need to get back to latest checkpoint.
+  if not next_step then
+    -- Whether we got the GPS fix or not, try getting back to last checkpoint.
+    -- With no GPS fix, the potential problem is that the TBotAPI might
+    -- be out of sync with the turtle's real position if the server shut down
+    -- exactly in between the turtle's movement and saving its new position to disk...
+    _get_back_to_last_checkpoint()
+  end
+    
+  -- Return next step.
+  return next_step
 end
 
 
@@ -450,20 +659,14 @@ if not initial_refuel then
   return
 end
 
--- Confirm launch.
-print()
-print("IMPORTANT: This program works for a certain pattern only.")
-print()
-print("About to start the mission.")
-print("Are you sure your turtle is properly positionned and you want to continue?")
-print("Hold Ctrl+T now to cancel, or ENTER to proceed.")
-read()
-print("Starting job.")
-
 -- Initial inventory sorting.
 print("Initial inventory sorting...")
 TBotAPI.groupInventoryResources()
 print("Done.")
+
+-- Resume operations (if the turtle was not moved to far away from its last position).
+local start_step = _resumeActivities()
+runCycle(start_step)
 
 while runCycle() do
   -- Well... nothing to do here, waiting for the cycle to complete.
