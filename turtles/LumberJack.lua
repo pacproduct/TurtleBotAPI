@@ -1,7 +1,7 @@
 -- LumberJack script.
 -- This program requires the TBotAPI software.
 
-local version = "1.2.7"
+local version = "1.2.8"
 print("LumberJack v" .. version)
 print()
 
@@ -645,6 +645,25 @@ function _resumeActivities()
   return next_step
 end
 
+-- Generates the 'startup' file and writes it down to disk so
+-- this program restarts automatically when the turtle boots up
+-- (after a server reboot for instance).
+-- @param Array arguments: The arguments that were received by the program
+--   (via {...}).
+function _generate_autorun_file(arguments)
+  if arguments == nil then
+    arguments = {}
+  end
+  --Generate the autorun file content.
+  local program_full_path = shell.getRunningProgram()
+  local autorun_content = "shell.run(\"" .. program_full_path .. " " .. table.concat(arguments, " ") .. "\")"
+  
+  -- Writes the autorun file down to disk.
+  local f = fs.open("startup", "w")
+  f.write(autorun_content)
+  f.close()
+end
+
 
 
 
@@ -658,6 +677,11 @@ if not initial_refuel then
   print("Please add more fuel items to it and restart the program.")
   return
 end
+
+-- Writes the autorun file so the turtle resumes operations when the server restarts.
+print("Writing 'startup' file to disk...")
+_generate_autorun_file({...})
+print("Done.")
 
 -- Initial inventory sorting.
 print("Initial inventory sorting...")
