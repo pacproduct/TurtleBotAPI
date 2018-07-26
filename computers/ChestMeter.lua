@@ -130,6 +130,8 @@ while true do
       monitor.setTextColor(data_color)    
       monitor.clear()
       
+      monitor_width, monitor_height = monitor.getSize()
+      
       pos_y = monitor_height-(monitor_height-4)/2
       --[[
       newLine(monitor,5)
