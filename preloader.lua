@@ -1,5 +1,5 @@
 -- update pastebin at https://pastebin.com/zfVbYhca to load into the turtle
--- load with "pastebin get zfVbYhca"
+-- load with "pastebin get zfVbYhca install"
 
 if not http then
     print("Sorry, I need access to the interwebs to download stuffs.")

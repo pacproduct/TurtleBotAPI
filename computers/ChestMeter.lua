@@ -42,7 +42,7 @@ local tmp_data
 local monitor
 local monitor_width, monitor_height
 local pos_y
-local battery_data_color
+local data_color
 
 
 
@@ -116,9 +116,9 @@ while true do
         total_items = total_items + value.count
       end
       
-      local percent = round(total_items/(total_slots*64)*10000)/100
+      percent = round(total_items/(total_slots*64)*10000)/100
     
-      local data_color = 2 -- orange
+      data_color = 2 -- orange
       if percent>50 then
         data_color = 32 -- vert
       end
@@ -129,6 +129,8 @@ while true do
       
       monitor.setTextColor(data_color)    
       monitor.clear()
+      
+      pos_y = monitor_height-(monitor_height-4)/2
       --[[
       newLine(monitor,5)
       monitor.write(round(total_filled_slots).." used")
@@ -139,7 +141,7 @@ while true do
       newLine(monitor,5)
       monitor.write(tostring(round(total_slots*64)))
       ]]
-      newLine(monitor,5)
+      newLine(monitor,pos_y)
       monitor.write(percent.."%")
       
     
