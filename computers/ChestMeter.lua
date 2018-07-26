@@ -127,7 +127,7 @@ while true do
       end
       
       
-      monitor.setTextColor(battery_data_color)    
+      monitor.setTextColor(data_color)    
       --[[
       monitor.clear()
       newLine(monitor,5)
