@@ -13,7 +13,7 @@ end
 local default_branch = "master"
 local branch = default_branch
 
-local version = "0.0.4c"
+local version = "0.0.4d"
 
 local arg = {...}
 
