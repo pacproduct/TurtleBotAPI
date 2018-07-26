@@ -128,8 +128,8 @@ while true do
       
       
       monitor.setTextColor(data_color)    
-      --[[
       monitor.clear()
+      --[[
       newLine(monitor,5)
       monitor.write(round(total_filled_slots).." used")
       newLine(monitor,5)
@@ -138,7 +138,8 @@ while true do
       monitor.write(total_items.." on")
       newLine(monitor,5)
       monitor.write(tostring(round(total_slots*64)))
-      newLine(monitor,5)]]
+      ]]
+      newLine(monitor,5)
       monitor.write(percent.."%")
       
     
