@@ -115,6 +115,20 @@ while true do
         total_filled_slots = total_filled_slots + 1
         total_items = total_items + value.count
       end
+      
+      local percent = round(total_items/(total_slots*64)*10000)/100
+    
+      local data_color = 2 -- orange
+      if percent>50 then
+        data_color = 32 -- vert
+      end
+      if percent<20 then
+        data_color = 16384 -- rouge
+      end
+      
+      
+      monitor.setTextColor(battery_data_color)    
+      --[[
       monitor.clear()
       newLine(monitor,5)
       monitor.write(round(total_filled_slots).." used")
@@ -124,8 +138,8 @@ while true do
       monitor.write(total_items.." on")
       newLine(monitor,5)
       monitor.write(tostring(round(total_slots*64)))
-      newLine(monitor,5)
-      monitor.write((round(total_items/(total_slots*64)*10000)/100).."%")
+      newLine(monitor,5)]]
+      monitor.write(percent.."%")
       
     
     end
