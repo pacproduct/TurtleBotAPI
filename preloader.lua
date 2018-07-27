@@ -38,6 +38,7 @@ if request then
         local f = fs.open(program_name, "w")
         f.write(script)
         f.close()
+        shell.run(program_name)
         print("loader updated, bye")
     else
         print("Oh dear, something went wrong (bad HTTP response code " .. response .. ").")
